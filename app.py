@@ -75,9 +75,9 @@ async def gerar_grafico(request: Request):
     ax.spines['top'].set_visible(False)
     ax.spines['left'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
     ax.spines['bottom'].set_color('#fff')
-    ax.spines['bottom'].set_linewidth(1.6)
+    ax.spines['bottom'].set_linewidth(1.0)
 
     # Grid horizontal só
     ax.grid(which='major', axis='y', linestyle='--', alpha=0.4, color="white", zorder=0)
