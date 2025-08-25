@@ -75,7 +75,10 @@ async def gerar_grafico(request: Request):
     ax.tick_params(axis='y', colors='#fff')
 
     ax.set_xticks(range(len(labels)))
-    ax.set_xticklabels(labels, rotation=20, ha='right', fontsize=12, color="#fff")
+    if legenda:
+        ax.set_xticklabels(labels, rotation=20, ha='right', fontsize=12, color="#fff")
+    else:
+        ax.set_xticklabels(['']*len(labels))
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.spines['left'].set_color('#fff')
