@@ -9,7 +9,7 @@ import base64
 app = FastAPI()
 
 def hex_rgb(color):
-    if isinstance(color, tuple):  # já está em formato correto
+    if isinstance(color, tuple):
         return color
     if color.startswith('rgb'):
         parts = color.replace('rgb', '').replace('(', '').replace(')', '').split(',')
@@ -28,8 +28,8 @@ async def gerar_grafico(request: Request):
     insumos = req.get("insumos", [])
     settings = req.get("personalizacao", {})
 
-    largura = int(settings.get("largura", 1200))   # largura do gráfico
-    altura = int(settings.get("altura", 400))      # altura do gráfico
+    largura = int(settings.get("largura", 1200))
+    altura = int(settings.get("altura", 400))
     cor_verde = hex_rgb(settings.get("cor_verde", "#25ad60"))
     cor_amarelo = hex_rgb(settings.get("cor_amarelo", "#f4cb33"))
     cor_azul = hex_rgb(settings.get("cor_azul", "#2986cc"))
@@ -44,13 +44,13 @@ async def gerar_grafico(request: Request):
     totais = [v+a for v, a in zip(verdes, amarelos)]
     indices = range(len(labels))
 
-    # ==== CRIA GRÁFICO PNG TRANSPARENTE =====
+    # ==== GRAFICO PNG TRANSPARENTE =====
     dpi = 100
     fig, ax = plt.subplots(figsize=(largura/dpi, altura/dpi), dpi=dpi)
 
     bar_width = 0.8
 
-    # Y sempre com 4 divisões
+    # Eixo Y - sempre 4 divisões iguais
     max_y = max(totais) if any(totais) else 1
     num_yticks = 4
     yticks = np.linspace(0, max_y, num_yticks)
@@ -71,28 +71,31 @@ async def gerar_grafico(request: Request):
     barras_amarelas = ax.bar(indices, amarelos, bar_width, color=cor_amarelo, label="Amarelo", zorder=2)
     barras_verdes = ax.bar(indices, verdes, bar_width, bottom=amarelos, color=cor_verde, label="Verde", zorder=2)
 
-    # Linhas grade horizontal
-    for spine in ax.spines.values():
-        spine.set_linewidth(1.2)
+    # ==== SÓ A BASE DA CAIXA DO GRÁFICO VISÍVEL ====
+    ax.spines['top'].set_visible(False)
+    ax.spines['left'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.spines['bottom'].set_visible(True)
+    ax.spines['bottom'].set_color('#fff')
+    ax.spines['bottom'].set_linewidth(1.6)
+
+    # Grid horizontal só
     ax.grid(which='major', axis='y', linestyle='--', alpha=0.4, color="white", zorder=0)
 
-    # LÓGICA LABELS: mostra internos só para barra "alta" (mais de 30 px)
+    # Labels: valor só no topo se barra pequena
     for idx, (rect_am, rect_ve, valor_am, valor_ve, total) in enumerate(zip(
         barras_amarelas, barras_verdes, amarelos, verdes, totais)):
-        # Altura da coluna em pixels no gráfico
+        # Altura visual da coluna em px
         topo_coluna = rect_am.get_height() + rect_ve.get_height()
         _, pix0 = ax.transData.transform((0, 0))
         _, pix1 = ax.transData.transform((0, topo_coluna))
         altura_pixel = abs(pix1 - pix0)
-
-        # Só mostrar valores internos se barra for "alta"
         show_internal = altura_pixel > 30
 
-        # Valor total no topo
+        # Valor total no topo da barra
         if total > 0:
             plt.text(idx, total + max_y*0.016, f'R$ {total:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
                      ha="center", va="bottom", fontweight="bold", fontsize=13, color='white')
-        # Valores internos só em barras grandes!
         if show_internal:
             if valor_am > 0:
                 plt.text(rect_am.get_x() + rect_am.get_width()/2, valor_am / 2,
@@ -103,7 +106,7 @@ async def gerar_grafico(request: Request):
                          f'R$ {valor_ve:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
                          ha='center', va='center', fontsize=11, color="#fff", fontweight="bold")
 
-    # Legenda visível só se legenda = true
+    # Legenda
     if legenda:
         ax.legend(loc='upper right', fontsize=13, facecolor='none', frameon=False)
     else:
@@ -112,17 +115,16 @@ async def gerar_grafico(request: Request):
 
     plt.tight_layout()
 
-    # Salvar gráfico RGBA
+    # Salvar gráfico
     buf = io.BytesIO()
     plt.savefig(buf, format='png', transparent=True)
     plt.close(fig)
     buf.seek(0)
     grafico_img = Image.open(buf).convert("RGBA")
 
-    # FUNDO: original SEM redimensionamento!
+    # Fundo BG original sem redimensionar!
     if background_b64:
         bg = Image.open(io.BytesIO(base64.b64decode(background_b64))).convert("RGBA")
-        bg_w, bg_h = bg.size
         output_img = bg.copy()
         output_img.alpha_composite(grafico_img, (x, y))
         out_buf = io.BytesIO()
@@ -130,6 +132,5 @@ async def gerar_grafico(request: Request):
         out_buf.seek(0)
         return StreamingResponse(out_buf, media_type='image/png')
 
-    # Caso não tenha background, retorna só o gráfico
     buf.seek(0)
     return StreamingResponse(buf, media_type='image/png')
