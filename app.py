@@ -75,7 +75,7 @@ async def gerar_grafico(request: Request):
     ax.spines['top'].set_visible(False)
     ax.spines['left'].set_visible(False)
     ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(True)
+    ax.spines['bottom'].set_visible(False)
     ax.spines['bottom'].set_color('#fff')
     ax.spines['bottom'].set_linewidth(1.6)
 
