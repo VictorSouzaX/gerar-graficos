@@ -1,3 +1,27 @@
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse
+import matplotlib.pyplot as plt
+import numpy as np
+from PIL import Image
+import io
+import base64
+
+app = FastAPI()
+
+def hex_rgb(color: str):
+    """Converte string de cor para formato aceito pelo matplotlib"""
+    if isinstance(color, tuple):
+        return color
+    if color.startswith("rgb"):
+        parts = color.replace("rgb", "").replace("(", "").replace(")", "").split(",")
+        return tuple(int(p.strip()) / 255 for p in parts)
+    if color.startswith("#"):
+        color = color.lstrip("#")
+        if len(color) == 3:
+            color = "".join([c * 2 for c in color])
+        return "#" + color
+    return color
+
 @app.post("/grafico")
 async def gerar_grafico(request: Request):
     req = await request.json()
@@ -20,7 +44,7 @@ async def gerar_grafico(request: Request):
         if not isinstance(v, str):
             return 0.0
         s = v.strip().replace("R$", "").replace(" ", "")
-        # Trata diferentes formatos
+        # Trata diferentes formatos: 1.234.567,89 | 1234567,89 | 1,234,567.89 | 1234567.89
         if s.count(",") == 1 and s.count(".") > 1:
             s = s.replace(".", "").replace(",", ".")
         elif s.count(",") == 1 and s.count(".") == 0:
