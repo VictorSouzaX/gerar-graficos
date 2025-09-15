@@ -8,17 +8,18 @@ import base64
 
 app = FastAPI()
 
-def hex_rgb(color):
+def hex_rgb(color: str):
+    """Converte string de cor para formato aceito pelo matplotlib"""
     if isinstance(color, tuple):
         return color
-    if color.startswith('rgb'):
-        parts = color.replace('rgb', '').replace('(', '').replace(')', '').split(',')
+    if color.startswith("rgb"):
+        parts = color.replace("rgb", "").replace("(", "").replace(")", "").split(",")
         return tuple(int(p.strip()) / 255 for p in parts)
-    if color.startswith('#'):
-        color = color.lstrip('#')
+    if color.startswith("#"):
+        color = color.lstrip("#")
         if len(color) == 3:
-            color = ''.join([c*2 for c in color])
-        return '#' + color
+            color = "".join([c * 2 for c in color])
+        return "#" + color
     return color
 
 @app.post("/grafico")
@@ -37,7 +38,7 @@ async def gerar_grafico(request: Request):
     background_b64 = settings.get("background_b64", None)
 
     labels = [item["titulo"] for item in insumos]
-    valores = [item.get("valor_verde", 0.0) for item in insumos]  # agora só um valor
+    valores = [item.get("valor_verde", 0.0) for item in insumos]
     indices = range(len(labels))
 
     # ==== GRAFICO PNG TRANSPARENTE =====
@@ -54,41 +55,43 @@ async def gerar_grafico(request: Request):
     ax.set_yticks(yticks)
     ylabels = [f"R$ {y/1e6:.1f} Mi" if y != 0 else "R$ 0,0 Mi" for y in yticks]
     ax.set_yticklabels(ylabels, fontsize=13, color="#fff")
-    ax.tick_params(axis='y', colors='#fff')
+    ax.tick_params(axis="y", colors="#fff")
 
     # Eixo X
     ax.set_xticks(range(len(labels)))
     if legenda:
-        ax.set_xticklabels(labels, rotation=20, ha='right', fontsize=12, color="#fff")
+        ax.set_xticklabels(labels, rotation=0, ha="center", fontsize=12, color="#fff")
     else:
-        ax.set_xticklabels(['']*len(labels))
+        ax.set_xticklabels([""] * len(labels))
 
-    # Barras (apenas uma cor)
+    # Barras
     ax.bar(indices, valores, bar_width, color=cor_barra, label="Valores", zorder=2)
 
     # ==== SÓ A BASE DA CAIXA DO GRÁFICO VISÍVEL ====
-    ax.spines['top'].set_visible(False)
-    ax.spines['left'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['bottom'].set_visible(True)
-    ax.spines['bottom'].set_color('#fff')
-    ax.spines['bottom'].set_linewidth(1.0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["left"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.spines["bottom"].set_visible(True)
+    ax.spines["bottom"].set_color("#fff")
+    ax.spines["bottom"].set_linewidth(1.0)
 
-    # Grid horizontal só
-    ax.grid(which='major', axis='y', linestyle='--', alpha=0.4, color="white", zorder=0)
+    # Grid horizontal
+    ax.grid(which="major", axis="y", linestyle="--", alpha=0.4, color="white", zorder=0)
 
-    # Valor total no topo da barra
+    # Valor em cima da barra
     for idx, total in enumerate(valores):
         if total > 0:
-            plt.text(idx, total + max_y*0.016,
-                     f'R$ {total:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
-                     ha="center", va="bottom", fontweight="bold", fontsize=13, color='white')
+            valor_fmt = f"R$ {total:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            ax.text(idx, total + max_y * 0.016,
+                    valor_fmt,
+                    ha="center", va="bottom",
+                    fontweight="bold", fontsize=13, color="white")
 
-    # Legenda fixa com Arial 18px
+    # Legenda
     if legenda:
-        ax.legend(loc='upper right',
+        ax.legend(loc="upper right",
                   fontsize=18,
-                  facecolor='none',
+                  facecolor="none",
                   frameon=False,
                   prop={"family": "Arial"})
     else:
@@ -99,7 +102,7 @@ async def gerar_grafico(request: Request):
 
     # Salvar gráfico
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', transparent=True)
+    plt.savefig(buf, format="png", transparent=True)
     plt.close(fig)
     buf.seek(0)
     grafico_img = Image.open(buf).convert("RGBA")
@@ -112,7 +115,7 @@ async def gerar_grafico(request: Request):
         out_buf = io.BytesIO()
         output_img.save(out_buf, format="PNG")
         out_buf.seek(0)
-        return StreamingResponse(out_buf, media_type='image/png')
+        return StreamingResponse(out_buf, media_type="image/png")
 
     buf.seek(0)
-    return StreamingResponse(buf, media_type='image/png')
+    return StreamingResponse(buf, media_type="image/png")
