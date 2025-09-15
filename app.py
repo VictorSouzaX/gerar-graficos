@@ -1,27 +1,3 @@
-from fastapi import FastAPI, Request
-from fastapi.responses import StreamingResponse
-import matplotlib.pyplot as plt
-import numpy as np
-from PIL import Image
-import io
-import base64
-
-app = FastAPI()
-
-def hex_rgb(color: str):
-    """Converte string de cor para formato aceito pelo matplotlib"""
-    if isinstance(color, tuple):
-        return color
-    if color.startswith("rgb"):
-        parts = color.replace("rgb", "").replace("(", "").replace(")", "").split(",")
-        return tuple(int(p.strip()) / 255 for p in parts)
-    if color.startswith("#"):
-        color = color.lstrip("#")
-        if len(color) == 3:
-            color = "".join([c * 2 for c in color])
-        return "#" + color
-    return color
-
 @app.post("/grafico")
 async def gerar_grafico(request: Request):
     req = await request.json()
@@ -37,8 +13,27 @@ async def gerar_grafico(request: Request):
     y = int(settings.get("y", 0))
     background_b64 = settings.get("background_b64", None)
 
-    labels = [item["titulo"] for item in insumos]
-    valores = [item.get("valor_verde", 0.0) for item in insumos]
+    # Função robusta para transformar em float
+    def to_float(v):
+        if isinstance(v, (int, float)):
+            return float(v)
+        if not isinstance(v, str):
+            return 0.0
+        s = v.strip().replace("R$", "").replace(" ", "")
+        # Trata diferentes formatos
+        if s.count(",") == 1 and s.count(".") > 1:
+            s = s.replace(".", "").replace(",", ".")
+        elif s.count(",") == 1 and s.count(".") == 0:
+            s = s.replace(",", ".")
+        else:
+            s = s.replace(",", "")
+        try:
+            return float(s)
+        except Exception:
+            return 0.0
+
+    labels = [item.get("titulo", "") for item in insumos]
+    valores = [to_float(item.get("valor_verde", item.get("valor", 0))) for item in insumos]
     indices = range(len(labels))
 
     # ==== GRAFICO PNG TRANSPARENTE =====
