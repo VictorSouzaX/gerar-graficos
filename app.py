@@ -30,18 +30,14 @@ async def gerar_grafico(request: Request):
 
     largura = int(settings.get("largura", 1200))
     altura = int(settings.get("altura", 400))
-    cor_verde = hex_rgb(settings.get("cor_verde", "#25ad60"))
-    cor_amarelo = hex_rgb(settings.get("cor_amarelo", "#f4cb33"))
-    cor_azul = hex_rgb(settings.get("cor_azul", "#2986cc"))
+    cor_barra = hex_rgb(settings.get("cor_barra", "#25ad60"))
     legenda = settings.get("legenda", True)
     x = int(settings.get("x", 0))
     y = int(settings.get("y", 0))
     background_b64 = settings.get("background_b64", None)
 
     labels = [item["titulo"] for item in insumos]
-    verdes = [item.get("valor_verde", 0.0) for item in insumos]
-    amarelos = [item.get("valor_amarelo", 0.0) for item in insumos]
-    totais = [v+a for v, a in zip(verdes, amarelos)]
+    valores = [item.get("valor_verde", 0.0) for item in insumos]  # agora só um valor
     indices = range(len(labels))
 
     # ==== GRAFICO PNG TRANSPARENTE =====
@@ -51,7 +47,7 @@ async def gerar_grafico(request: Request):
     bar_width = 0.8
 
     # Eixo Y - sempre 4 divisões iguais
-    max_y = max(totais) if any(totais) else 1
+    max_y = max(valores) if any(valores) else 1
     num_yticks = 4
     yticks = np.linspace(0, max_y, num_yticks)
     ax.set_ylim([0, max_y * 1.05])
@@ -67,9 +63,8 @@ async def gerar_grafico(request: Request):
     else:
         ax.set_xticklabels(['']*len(labels))
 
-    # Barras
-    barras_amarelas = ax.bar(indices, amarelos, bar_width, color=cor_amarelo, label="Amarelo", zorder=2)
-    barras_verdes = ax.bar(indices, verdes, bar_width, bottom=amarelos, color=cor_verde, label="Verde", zorder=2)
+    # Barras (apenas uma cor)
+    ax.bar(indices, valores, bar_width, color=cor_barra, label="Valores", zorder=2)
 
     # ==== SÓ A BASE DA CAIXA DO GRÁFICO VISÍVEL ====
     ax.spines['top'].set_visible(False)
@@ -82,33 +77,20 @@ async def gerar_grafico(request: Request):
     # Grid horizontal só
     ax.grid(which='major', axis='y', linestyle='--', alpha=0.4, color="white", zorder=0)
 
-    # Labels: valor só no topo se barra pequena
-    for idx, (rect_am, rect_ve, valor_am, valor_ve, total) in enumerate(zip(
-        barras_amarelas, barras_verdes, amarelos, verdes, totais)):
-        # Altura visual da coluna em px
-        topo_coluna = rect_am.get_height() + rect_ve.get_height()
-        _, pix0 = ax.transData.transform((0, 0))
-        _, pix1 = ax.transData.transform((0, topo_coluna))
-        altura_pixel = abs(pix1 - pix0)
-        show_internal = altura_pixel > 30
-
-        # Valor total no topo da barra
+    # Valor total no topo da barra
+    for idx, total in enumerate(valores):
         if total > 0:
-            plt.text(idx, total + max_y*0.016, f'R$ {total:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
+            plt.text(idx, total + max_y*0.016,
+                     f'R$ {total:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
                      ha="center", va="bottom", fontweight="bold", fontsize=13, color='white')
-        if show_internal:
-            if valor_am > 0:
-                plt.text(rect_am.get_x() + rect_am.get_width()/2, valor_am / 2,
-                         f'R$ {valor_am:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
-                         ha='center', va='center', fontsize=11, color="#fff", fontweight="bold")
-            if valor_ve > 0:
-                plt.text(rect_ve.get_x() + rect_ve.get_width()/2, valor_ve / 2 + valor_am,
-                         f'R$ {valor_ve:,.2f}'.replace(',', 'X').replace('.', ',').replace('X', '.'),
-                         ha='center', va='center', fontsize=11, color="#fff", fontweight="bold")
 
-    # Legenda
+    # Legenda fixa com Arial 18px
     if legenda:
-        ax.legend(loc='upper right', fontsize=13, facecolor='none', frameon=False)
+        ax.legend(loc='upper right',
+                  fontsize=18,
+                  facecolor='none',
+                  frameon=False,
+                  prop={"family": "Arial"})
     else:
         if ax.get_legend():
             ax.get_legend().remove()
