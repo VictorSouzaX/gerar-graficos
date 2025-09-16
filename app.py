@@ -8,6 +8,7 @@ import base64
 
 app = FastAPI()
 
+
 def hex_rgb(color: str):
     """Converte string de cor para formato aceito pelo matplotlib"""
     if isinstance(color, tuple):
@@ -22,22 +23,12 @@ def hex_rgb(color: str):
         return "#" + color
     return color
 
+
 @app.post("/grafico")
 async def gerar_grafico(request: Request):
     req = await request.json()
 
-    insumos = req.get("insumos", [])
-    settings = req.get("personalizacao", {})
-
-    largura = int(settings.get("largura", 1200))
-    altura = int(settings.get("altura", 400))
-    cor_barra = hex_rgb(settings.get("cor_barra", "#25ad60"))
-    legenda = settings.get("legenda", True)
-    x = int(settings.get("x", 0))
-    y = int(settings.get("y", 0))
-    background_b64 = settings.get("background_b64", None)
-
-    # Função robusta para transformar em float
+    # ======= NOVO: Filtra insumos zerados
     def to_float(v):
         if isinstance(v, (int, float)):
             return float(v)
@@ -56,7 +47,37 @@ async def gerar_grafico(request: Request):
         except Exception:
             return 0.0
 
-    labels = [item.get("titulo", "") for item in insumos]
+    raw_insumos = req.get("insumos", [])
+
+    # Só insumos com valor > 0
+    insumos = [i for i in raw_insumos if to_float(i.get("valor_verde", i.get("valor", 0))) > 0]
+
+    settings = req.get("personalizacao", {})
+
+    largura = int(settings.get("largura", 1200))
+    altura = int(settings.get("altura", 400))
+    cor_barra = hex_rgb(settings.get("cor_barra", "#25ad60"))
+    legenda = settings.get("legenda", True)  # Não será usado, legenda sempre removida
+    x = int(settings.get("x", 0))
+    y = int(settings.get("y", 0))
+    background_b64 = settings.get("background_b64", None)
+
+    # ==== QUEBRA DE LINHA nos labels (NÃO deixa sobrepor) =====
+    def break_label(s, width=18):
+        # Troca ' ' por \n para não dividir palavras no meio
+        parts, cur, count = [], "", 0
+        for char in s:
+            cur += char
+            count += 1
+            if count >= width and char == " ":
+                parts.append(cur.rstrip())
+                cur = ""
+                count = 0
+        if cur:
+            parts.append(cur.rstrip())
+        return '\n'.join(parts) if len(parts) > 0 else s
+
+    labels = [break_label(item.get("titulo", ""), 18) for item in insumos]
     valores = [to_float(item.get("valor_verde", item.get("valor", 0))) for item in insumos]
     indices = range(len(labels))
 
@@ -78,13 +99,10 @@ async def gerar_grafico(request: Request):
 
     # Eixo X
     ax.set_xticks(range(len(labels)))
-    if legenda:
-        ax.set_xticklabels(labels, rotation=0, ha="center", fontsize=12, color="#fff")
-    else:
-        ax.set_xticklabels([""] * len(labels))
+    ax.set_xticklabels(labels, rotation=0, ha="center", fontsize=12, color="#fff")
 
     # Barras
-    ax.bar(indices, valores, bar_width, color=cor_barra, label="Valores", zorder=2)
+    ax.bar(indices, valores, bar_width, color=cor_barra, zorder=2)
 
     # ==== SÓ A BASE DA CAIXA DO GRÁFICO VISÍVEL ====
     ax.spines["top"].set_visible(False)
@@ -106,16 +124,9 @@ async def gerar_grafico(request: Request):
                     ha="center", va="bottom",
                     fontweight="bold", fontsize=13, color="white")
 
-    # Legenda
-    if legenda:
-        ax.legend(loc="upper right",
-                  fontsize=18,
-                  facecolor="none",
-                  frameon=False,
-                  prop={"family": "Arial"})
-    else:
-        if ax.get_legend():
-            ax.get_legend().remove()
+    # ==== REMOVE A LEGENDA SEMPRE ====
+    if ax.get_legend():
+        ax.get_legend().remove()
 
     plt.tight_layout()
 
